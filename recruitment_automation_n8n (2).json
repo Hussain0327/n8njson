@@ -1,0 +1,2431 @@
+                    "content": "=Daily Recruitment Metrics for {{ $json.date }}:\n\nCANDIDATE PIPELINE:\n- Applications Today: {{ $json.total_applications_today }}\n- Applications This Week: {{ $json.total_applications_week }}\n- Applications This Month: {{ $json.total_applications_month }}\n- Qualified Candidates: {{ $json.qualified_candidates }}\n- High Score Candidates (8+): {{ $json.high_score_candidates }}\n- Average AI Score: {{ $json.average_ai_score }}\n- Interviews Scheduled: {{ $json.interviews_scheduled }}\n- Offers Made: {{ $json.offers_made }}\n- Placements Completed: {{ $json.placements_completed }}\n\nCONVERSION RATES:\n- Application to Qualified: {{ $json.conversion_rates.application_to_qualified }}%\n- Qualified to Interview: {{ $json.conversion_rates.qualified_to_interview }}%\n- Interview to Offer: {{ $json.conversion_rates.interview_to_offer }}%\n- Offer to Placement: {{ $json.conversion_rates.offer_to_placement }}%\n\nCLIENT METRICS:\n- Total Prospects: {{ $json.total_prospects }}\n- Active Clients: {{ $json.active_clients }}\n- New Leads Today: {{ $json.new_leads_today }}\n- Hot Prospects: {{ $json.hot_prospects }}\n- Warm Prospects: {{ $json.warm_prospects }}\n\nREVENUE METRICS:\n- Total Revenue: ${{ $json.total_revenue }}\n- Monthly Revenue: ${{ $json.monthly_revenue }}\n- Average Placement Value: ${{ $json.average_placement_value }}\n- Pipeline Value: ${{ $json.pipeline_value }}\n\nACTIVITY METRICS:\n- Total Activities Today: {{ $json.total_activities_today }}\n- Emails Sent: {{ $json.emails_sent }}\n- Meetings Held: {{ $json.meetings_held }}\n\nGenerate comprehensive analysis with actionable insights."
+                  }
+                ]
+              }
+            },
+            "id": "ai-analytics-insights",
+            "name": "AI Analytics & Insights",
+            "type": "@n8n/n8n-nodes-langchain.openAi",
+            "typeVersion": 1,
+            "position": [1120, 300],
+            "credentials": {
+              "openAiApi": {
+                "id": "",
+                "name": "OpenAI API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "analytics@yourcompany.com",
+              "toEmail": "management@yourcompany.com,team@yourcompany.com",
+              "subject": "=📊 Daily Recruitment Analytics Report - {{ $('calculate-daily-metrics').item.json.date }}",
+              "text": "={{ $json.choices[0].message.content }}",
+              "options": {
+                "contentType": "html"
+              }
+            },
+            "id": "send-analytics-report",
+            "name": "Send Analytics Report",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1340, 300],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "rule": {
+                "interval": [
+                  {
+                    "field": "cronExpression",
+                    "expression": "0 17 * * 5"
+                  }
+                ]
+              }
+            },
+            "id": "cron-weekly-report",
+            "name": "Weekly Report Trigger",
+            "type": "n8n-nodes-base.cron",
+            "typeVersion": 1,
+            "position": [240, 800]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "read",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Performance Metrics",
+                "mode": "list"
+              },
+              "options": {}
+            },
+            "id": "get-weekly-metrics",
+            "name": "Get Weekly Metrics",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [460, 800],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "jsCode": "// Calculate weekly trends and comparisons\nconst weeklyData = $input.all();\nconst now = new Date();\nconst sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\nconst fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);\n\n// Filter data for this week and last week\nconst thisWeekData = weeklyData.filter(d => {\n  const date = new Date(d.json.date);\n  return date >= sevenDaysAgo && date <= now;\n});\n\nconst lastWeekData = weeklyData.filter(d => {\n  const date = new Date(d.json.date);\n  return date >= fourteenDaysAgo && date < sevenDaysAgo;\n});\n\n// Calculate weekly totals\nconst calculateWeeklyTotals = (data) => {\n  return data.reduce((totals, day) => {\n    return {\n      applications: totals.applications + (day.json.total_applications_today || 0),\n      placements: totals.placements + (day.json.placements_completed || 0),\n      revenue: totals.revenue + (day.json.monthly_revenue || 0),\n      qualified: totals.qualified + (day.json.qualified_candidates || 0),\n      interviews: totals.interviews + (day.json.interviews_scheduled || 0),\n      offers: totals.offers + (day.json.offers_made || 0),\n      new_leads: totals.new_leads + (day.json.new_leads_today || 0)\n    };\n  }, {\n    applications: 0,\n    placements: 0,\n    revenue: 0,\n    qualified: 0,\n    interviews: 0,\n    offers: 0,\n    new_leads: 0\n  });\n};\n\nconst thisWeekTotals = calculateWeeklyTotals(thisWeekData);\nconst lastWeekTotals = calculateWeeklyTotals(lastWeekData);\n\n// Calculate percentage changes\nconst calculateChange = (current, previous) => {\n  if (previous === 0) return current > 0 ? 100 : 0;\n  return ((current - previous) / previous * 100).toFixed(1);\n};\n\nconst weeklyComparison = {\n  applications_change: calculateChange(thisWeekTotals.applications, lastWeekTotals.applications),\n  placements_change: calculateChange(thisWeekTotals.placements, lastWeekTotals.placements),\n  revenue_change: calculateChange(thisWeekTotals.revenue, lastWeekTotals.revenue),\n  qualified_change: calculateChange(thisWeekTotals.qualified, lastWeekTotals.qualified),\n  interviews_change: calculateChange(thisWeekTotals.interviews, lastWeekTotals.interviews),\n  offers_change: calculateChange(thisWeekTotals.offers, lastWeekTotals.offers),\n  new_leads_change: calculateChange(thisWeekTotals.new_leads, lastWeekTotals.new_leads)\n};\n\n// Top performers and areas needing attention\nconst insights = {\n  best_performing_metric: Object.entries(weeklyComparison)\n    .sort(([,a], [,b]) => parseFloat(b) - parseFloat(a))[0],\n  worst_performing_metric: Object.entries(weeklyComparison)\n    .sort(([,a], [,b]) => parseFloat(a) - parseFloat(b))[0],\n  weekly_avg_conversion: thisWeekTotals.applications > 0 ? \n    (thisWeekTotals.placements / thisWeekTotals.applications * 100).toFixed(2) : 0\n};\n\nconst weeklyReport = {\n  week_ending: now.toISOString().split('T')[0],\n  this_week: thisWeekTotals,\n  last_week: lastWeekTotals,\n  changes: weeklyComparison,\n  insights: insights,\n  generated_at: now.toISOString()\n};\n\nreturn [{ json: weeklyReport }];"
+            },
+            "id": "calculate-weekly-trends",
+            "name": "Calculate Weekly Trends",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [680, 800]
+          },
+          {
+            "parameters": {
+              "model": "gpt-4",
+              "options": {
+                "temperature": 0.3,
+                "maxTokens": 1200
+              },
+              "messages": {
+                "values": [
+                  {
+                    "role": "system",
+                    "content": "You are a senior recruitment business analyst. Create an executive-level weekly performance report with strategic insights, trend analysis, and actionable recommendations. Include sections for: Executive Summary, Key Performance Highlights, Areas of Concern, Strategic Recommendations, and Next Week's Focus Areas. Format as professional HTML."
+                  },
+                  {
+                    "role": "user",
+                    "content": "=Weekly Performance Data:\n\nTHIS WEEK TOTALS:\n- Applications: {{ $json.this_week.applications }}\n- Qualified Candidates: {{ $json.this_week.qualified }}\n- Interviews: {{ $json.this_week.interviews }}\n- Offers: {{ $json.this_week.offers }}\n- Placements: {{ $json.this_week.placements }}\n- Revenue: ${{ $json.this_week.revenue }}\n- New Leads: {{ $json.this_week.new_leads }}\n\nWEEK-OVER-WEEK CHANGES:\n- Applications: {{ $json.changes.applications_change }}%\n- Placements: {{ $json.changes.placements_change }}%\n- Revenue: {{ $json.changes.revenue_change }}%\n- Qualified: {{ $json.changes.qualified_change }}%\n- Interviews: {{ $json.changes.interviews_change }}%\n- New Leads: {{ $json.changes.new_leads_change }}%\n\nINSIGHTS:\n- Best Performing Metric: {{ $json.insights.best_performing_metric[0] }} ({{ $json.insights.best_performing_metric[1] }}% change)\n- Needs Attention: {{ $json.insights.worst_performing_metric[0] }} ({{ $json.insights.worst_performing_metric[1] }}% change)\n- Weekly Conversion Rate: {{ $json.insights.weekly_avg_conversion }}%\n\nGenerate comprehensive executive weekly report."
+                  }
+                ]
+              }
+            },
+            "id": "ai-weekly-insights",
+            "name": "AI Weekly Insights",
+            "type": "@n8n/n8n-nodes-langchain.openAi",
+            "typeVersion": 1,
+            "position": [900, 800],
+            "credentials": {
+              "openAiApi": {
+                "id": "",
+                "name": "OpenAI API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "executive@yourcompany.com",
+              "toEmail": "ceo@yourcompany.com,management@yourcompany.com",
+              "subject": "=📈 Weekly Executive Recruitment Report - Week Ending {{ $('calculate-weekly-trends').item.json.week_ending }}",
+              "text": "={{ $json.choices[0].message.content }}",
+              "options": {
+                "contentType": "html"
+              }
+            },
+            "id": "send-weekly-report",
+            "name": "Send Weekly Executive Report",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1120, 800],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "trigger-dashboard-update",
+              "responseMode": "responseNode",
+              "options": {}
+            },
+            "id": "webhook-dashboard-update",
+            "name": "Dashboard Update Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [240, 1300],
+            "webhookId": "dashboard-update"
+          },
+          {
+            "parameters": {
+              "jsCode": "// Generate Looker Studio dashboard refresh URL and data source updates\nconst metrics = $input.first().json;\n\n// Create data structure for Looker Studio\nconst dashboardData = {\n  executive_summary: {\n    total_active_candidates: metrics.qualified_candidates || 0,\n    total_active_clients: metrics.active_clients || 0,\n    monthly_revenue: metrics.monthly_revenue || 0,\n    pipeline_value: metrics.pipeline_value || 0,\n    placement_velocity: metrics.average_placement_days || 30\n  },\n  candidate_funnel: {\n    applications: metrics.total_applications_month || 0,\n    qualified: metrics.qualified_candidates || 0,\n    interviews: metrics.interviews_scheduled || 0,\n    offers: metrics.offers_made || 0,\n    placements: metrics.placements_completed || 0\n  },\n  client_acquisition: {\n    total_prospects: metrics.total_prospects || 0,\n    hot_prospects: metrics.hot_prospects || 0,\n    warm_prospects: metrics.warm_prospects || 0,\n    cold_prospects: metrics.cold_prospects || 0,\n    active_clients: metrics.active_clients || 0\n  },\n  financial_performance: {\n    monthly_revenue: metrics.monthly_revenue || 0,\n    average_placement_value: metrics.average_placement_value || 0,\n    pipeline_value: metrics.pipeline_value || 0,\n    commission_rate: 20, // Default 20%\n    profit_margin: 75 // Default 75%\n  },\n  conversion_rates: {\n    application_to_qualified: metrics.conversion_rates?.application_to_qualified || 0,\n    qualified_to_interview: metrics.conversion_rates?.qualified_to_interview || 0,\n    interview_to_offer: metrics.conversion_rates?.interview_to_offer || 0,\n    offer_to_placement: metrics.conversion_rates?.offer_to_placement || 0\n  },\n  last_updated: new Date().toISOString()\n};\n\n// Looker Studio API endpoint (if using API)\nconst lookerStudioConfig = {\n  dashboard_id: 'YOUR_LOOKER_STUDIO_DASHBOARD_ID',\n  data_source_id: 'YOUR_DATA_SOURCE_ID',\n  refresh_url: 'https://lookerstudio.google.com/api/dashboard/refresh',\n  data: dashboardData\n};\n\nreturn [{ json: lookerStudioConfig }];"
+            },
+            "id": "prepare-dashboard-data",
+            "name": "Prepare Dashboard Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [460, 1300]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "clear",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Dashboard Data",
+                "mode": "list"
+              }
+            },
+            "id": "clear-dashboard-sheet",
+            "name": "Clear Dashboard Sheet",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [680, 1300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "append",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Dashboard Data",
+                "mode": "list"
+              },
+              "columnRow": "A1",
+              "dataMode": "autoMapInputData"
+            },
+            "id": "update-dashboard-sheet",
+            "name": "Update Dashboard Sheet",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [900, 1300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "authentication": "genericCredentialType",
+              "genericAuthType": "httpHeaderAuth",
+              "requestMethod": "POST",
+              "url": "https://datastudio.googleapis.com/v1/reports/YOUR_REPORT_ID:refresh",
+              "sendHeaders": true,
+              "headerParameters": {
+                "parameters": [
+                  {
+                    "name": "Authorization",
+                    "value": "Bearer YOUR_GOOGLE_API_TOKEN"
+                  },
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "sendBody": true,
+              "contentType": "json",
+              "jsonBody": "={\"refreshScope\": \"ALL_DATA_SOURCES\"}"
+            },
+            "id": "refresh-looker-dashboard",
+            "name": "Refresh Looker Dashboard",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [1120, 1300]
+          }
+        ],
+        "connections": {
+          "cron-daily-metrics": {
+            "main": [
+              [
+                {
+                  "node": "get-candidate-data",
+                  "type": "main",
+                  "index": 0
+                },
+                {
+                  "node": "get-client-data",
+                  "type": "main",
+                  "index": 0
+                },
+                {
+                  "node": "get-activity-data",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "get-candidate-data": {
+            "main": [
+              [
+                {
+                  "node": "calculate-daily-metrics",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "get-client-data": {
+            "main": [
+              [
+                {
+                  "node": "calculate-daily-metrics",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "get-activity-data": {
+            "main": [
+              [
+                {
+                  "node": "calculate-daily-metrics",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "calculate-daily-metrics": {
+            "main": [
+              [
+                {
+                  "node": "save-daily-metrics",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "save-daily-metrics": {
+            "main": [
+              [
+                {
+                  "node": "ai-analytics-insights",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "ai-analytics-insights": {
+            "main": [
+              [
+                {
+                  "node": "send-analytics-report",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "cron-weekly-report": {
+            "main": [
+              [
+                {
+                  "node": "get-weekly-metrics",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "get-weekly-metrics": {
+            "main": [
+              [
+                {
+                  "node": "calculate-weekly-trends",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "calculate-weekly-trends": {
+            "main": [
+              [
+                {
+                  "node": "ai-weekly-insights",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "ai-weekly-insights": {
+            "main": [
+              [
+                {
+                  "node": "send-weekly-report",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "webhook-dashboard-update": {
+            "main": [
+              [
+                {
+                  "node": "prepare-dashboard-data",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "prepare-dashboard-data": {
+            "main": [
+              [
+                {
+                  "node": "clear-dashboard-sheet",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "clear-dashboard-sheet": {
+            "main": [
+              [
+                {
+                  "node": "update-dashboard-sheet",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "update-dashboard-sheet": {
+            "main": [
+              [
+                {
+                  "node": "refresh-looker-dashboard",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "4. Placement & Financial Tracking System",
+      "description": "Commission calculations, placement celebrations, and financial reporting",
+      "workflow": {
+        "name": "Placement & Financial Tracking System",
+        "nodes": [
+          {
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "placement-completed",
+              "responseMode": "responseNode",
+              "options": {}
+            },
+            "id": "webhook-placement-completed",
+            "name": "Placement Completed Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [240, 300],
+            "webhookId": "placement-completed"
+          },
+          {
+            "parameters": {
+              "jsCode": "// Calculate comprehensive placement metrics and commissions\nconst placement = $input.first().json;\n\n// Commission calculation\nconst annualSalary = parseFloat(placement.annual_salary) || 0;\nconst commissionRate = parseFloat(placement.commission_rate) || 20; // Default 20%\nconst placementFee = annualSalary * (commissionRate / 100);\nconst agencyCommission = placementFee * 0.80; // Agency takes 80%\nconst recruiterCommission = placementFee * 0.20; // Recruiter gets 20%\n\n// Calculate placement timing metrics\nconst applicationDate = new Date(placement.application_date);\nconst placementDate = new Date();\nconst daysToPlacement = Math.floor((placementDate - applicationDate) / (1000 * 60 * 60 * 24));\n\n// Generate comprehensive placement record\nconst placementRecord = {\n  placement_id: 'PLACE_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5).toUpperCase(),\n  candidate_id: placement.candidate_id,\n  client_id: placement.client_id,\n  recruiter_id: placement.recruiter_id || 'unassigned',\n  position_title: placement.position_title,\n  annual_salary: annualSalary,\n  commission_rate: commissionRate,\n  placement_fee: placementFee,\n  agency_commission: agencyCommission,\n  recruiter_commission: recruiterCommission,\n  placement_date: placementDate.toISOString(),\n  start_date: placement.start_date || new Date(Date.now() + 14*24*60*60*1000).toISOString(), // Default 2 weeks from now\n  days_to_placement: daysToPlacement,\n  guarantee_period: placement.guarantee_period || 90, // Default 90 days\n  client_satisfaction: null,\n  candidate_satisfaction: null,\n  status: 'active',\n  payment_status: 'pending',\n  invoice_sent: false\n};\n\nreturn [{ json: placementRecord }];"
+            },
+            "id": "calculate-placement-metrics",
+            "name": "Calculate Placement Metrics",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [460, 300]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "append",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Placements",
+                "mode": "list"
+              },
+              "columnRow": "A1",
+              "dataMode": "autoMapInputData"
+            },
+            "id": "save-placement-record",
+            "name": "Save Placement Record",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [680, 300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "update",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Candidate Master",
+                "mode": "list"
+              },
+              "whereCondition": "=candidate_id={{ $json.candidate_id }}",
+              "columnRow": "A1",
+              "dataMode": "define",
+              "valueInputMode": "define",
+              "fieldsUi": {
+                "values": [
+                  {
+                    "column": "current_stage",
+                    "fieldValue": "Placed"
+                  },
+                  {
+                    "column": "placement_date",
+                    "fieldValue": "={{ $json.placement_date }}"
+                  },
+                  {
+                    "column": "commission_value",
+                    "fieldValue": "={{ $json.placement_fee }}"
+                  },
+                  {
+                    "column": "final_salary",
+                    "fieldValue": "={{ $json.annual_salary }}"
+                  }
+                ]
+              }
+            },
+            "id": "update-candidate-status",
+            "name": "Update Candidate Status",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [900, 300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "update",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Client Master",
+                "mode": "list"
+              },
+              "whereCondition": "=client_id={{ $json.client_id }}",
+              "columnRow": "A1",
+              "dataMode": "define",
+              "valueInputMode": "define",
+              "fieldsUi": {
+                "values": [
+                  {
+                    "column": "positions_filled",
+                    "fieldValue": "={{ $json.positions_filled + 1 }}"
+                  },
+                  {
+                    "column": "total_revenue",
+                    "fieldValue": "={{ $json.total_revenue + $('calculate-placement-metrics').item.json.placement_fee }}"
+                  },
+                  {
+                    "column": "last_placement",
+                    "fieldValue": "={{ $('calculate-placement-metrics').item.json.placement_date }}"
+                  },
+                  {
+                    "column": "relationship_strength",
+                    "fieldValue": "Hot"
+                  }
+                ]
+              }
+            },
+            "id": "update-client-revenue",
+            "name": "Update Client Revenue",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [1120, 300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "success@yourcompany.com",
+              "toEmail": "={{ $input.first().json.candidate_email }}",
+              "subject": "🎉 Congratulations on Your New Role!",
+              "text": "=Hi {{ $input.first().json.candidate_name }},\n\nCongratulations on landing your new role as {{ $('calculate-placement-metrics').item.json.position_title }}! 🚀\n\nWe're absolutely thrilled to have been part of your journey and to see you succeed.\n\n📋 What's Next:\n• Your start date: {{ new Date($('calculate-placement-metrics').item.json.start_date).toLocaleDateString() }}\n• Annual Salary: ${{ $('calculate-placement-metrics').item.json.annual_salary.toLocaleString() }}\n• We'll check in with you after your first week\n\n🤝 Stay Connected:\nWe'd love to stay in touch and hear about your progress. Don't hesitate to reach out if you need anything!\n\nWishing you all the best in your new adventure!\n\nBest regards,\n{{ $input.first().json.recruiter_name || 'The Recruitment Team' }}"
+            },
+            "id": "send-candidate-congratulations",
+            "name": "Send Candidate Congratulations",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1340, 200],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "partnerships@yourcompany.com",
+              "toEmail": "={{ $input.first().json.client_email }}",
+              "subject": "🎯 Successful Placement Completed - {{ $('calculate-placement-metrics').item.json.position_title }}",
+              "text": "=Hi {{ $input.first().json.client_contact_name }},\n\nGreat news! We've successfully completed the placement for the {{ $('calculate-placement-metrics').item.json.position_title }} role.\n\n📊 Placement Summary:\n• Candidate: {{ $input.first().json.candidate_name }}\n• Start Date: {{ new Date($('calculate-placement-metrics').item.json.start_date).toLocaleDateString() }}\n• Annual Salary: ${{ $('calculate-placement-metrics').item.json.annual_salary.toLocaleString() }}\n• Time to Fill: {{ $('calculate-placement-metrics').item.json.days_to_placement }} days\n• Placement Fee: ${{ $('calculate-placement-metrics').item.json.placement_fee.toLocaleString() }}\n\n📄 Next Steps:\n• Invoice will be sent within 24 hours\n• 90-day guarantee period begins on start date\n• We'll follow up to ensure smooth onboarding\n\n🤝 Future Opportunities:\nWe'd love to discuss your upcoming hiring needs. Are there any other positions we can help fill?\n\nThank you for trusting us with your recruitment needs!\n\nBest regards,\n{{ $input.first().json.account_manager || 'Account Management Team' }}"
+            },
+            "id": "send-client-completion",
+            "name": "Send Client Completion Notice",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1340, 300],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "finance@yourcompany.com",
+              "toEmail": "finance@yourcompany.com,management@yourcompany.com",
+              "subject": "💰 New Placement Revenue - ${{ $('calculate-placement-metrics').item.json.placement_fee.toLocaleString() }}",
+              "text": "=🎉 NEW PLACEMENT COMPLETED!\n\nPlacement Details:\n• Placement ID: {{ $('calculate-placement-metrics').item.json.placement_id }}\n• Position: {{ $('calculate-placement-metrics').item.json.position_title }}\n• Client: {{ $input.first().json.client_company }}\n• Candidate: {{ $input.first().json.candidate_name }}\n• Recruiter: {{ $('calculate-placement-metrics').item.json.recruiter_id }}\n\nFinancial Breakdown:\n• Annual Salary: ${{ $('calculate-placement-metrics').item.json.annual_salary.toLocaleString() }}\n• Commission Rate: {{ $('calculate-placement-metrics').item.json.commission_rate }}%\n• Total Placement Fee: ${{ $('calculate-placement-metrics').item.json.placement_fee.toLocaleString() }}\n• Agency Commission: ${{ $('calculate-placement-metrics').item.json.agency_commission.toLocaleString() }}\n• Recruiter Commission: ${{ $('calculate-placement-metrics').item.json.recruiter_commission.toLocaleString() }}\n\nTiming:\n• Time to Placement: {{ $('calculate-placement-metrics').item.json.days_to_placement }} days\n• Start Date: {{ new Date($('calculate-placement-metrics').item.json.start_date).toLocaleDateString() }}\n\nAction Required:\n• Generate and send invoice to client\n• Process recruiter commission payment\n• Update financial forecasts\n\nGreat work team! 🚀"
+            },
+            "id": "send-internal-notification",
+            "name": "Send Internal Notification",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1340, 400],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "rule": {
+                "interval": [
+                  {
+                    "field": "cronExpression",
+                    "expression": "0 9 1,8,15,22 * 5"
+                  }
+                ]
+              }
+            },
+            "id": "cron-followup-schedule",
+            "name": "Placement Follow-up Schedule",
+            "type": "n8n-nodes-base.cron",
+            "typeVersion": 1,
+            "position": [240, 800]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "read",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Placements",
+                "mode": "list"
+              },
+              "options": {}
+            },
+            "id": "get-recent-placements",
+            "name": "Get Recent Placements",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [460, 800],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "jsCode": "// Filter placements that need follow-up\nconst allPlacements = $input.all();\nconst now = new Date();\nconst followUpPlacements = [];\n\nfor (const item of allPlacements) {\n  const placement = item.json;\n  const startDate = new Date(placement.start_date);\n  const daysSinceStart = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));\n  \n  // Follow-up schedule: 1 week, 1 month, 3 months (end of guarantee)\n  const followUpSchedule = {\n    7: 'one_week',\n    30: 'one_month', \n    90: 'end_guarantee'\n  };\n  \n  // Check if we need to send follow-up\n  for (const [days, type] of Object.entries(followUpSchedule)) {\n    if (daysSinceStart === parseInt(days)) {\n      followUpPlacements.push({\n        json: {\n          ...placement,\n          followup_type: type,\n          days_since_start: daysSinceStart\n        }\n      });\n    }\n  }\n}\n\nreturn followUpPlacements;"
+            },
+            "id": "filter-followup-placements",
+            "name": "Filter Follow-up Placements",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [680, 800]
+          },
+          {
+            "parameters": {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "one-week",
+                    "leftValue": "={{ $json.followup_type }}",
+                    "rightValue": "one_week",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "one-month",
+                    "leftValue": "={{ $json.followup_type }}",
+                    "rightValue": "one_month",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "end-guarantee",
+                    "leftValue": "={{ $json.followup_type }}",
+                    "rightValue": "end_guarantee",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "fallbackOutput": "extra"
+            },
+            "id": "route-followup-type",
+            "name": "Route Follow-up Type",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3,
+            "position": [900, 800]
+          },
+          {
+            "parameters": {
+              "fromEmail": "success@yourcompany.com",
+              "toEmail": "={{ $json.candidate_email }}",
+              "subject": "👋 How's your first week going?",
+              "text": "=Hi {{ $json.candidate_name }},\n\nHope you're settling in well at {{ $json.client_company }}! 🎉\n\nWe wanted to check in and see how your first week as {{ $json.position_title }} is going.\n\n❓ Quick questions:\n• How has your onboarding experience been?\n• Are you feeling supported by your new team?\n• Is the role matching your expectations?\n• Any challenges we should know about?\n\nYour success is our success, so please don't hesitate to reach out if you need any support!\n\nBest regards,\n{{ $json.recruiter_name || 'Your Recruitment Team' }}"
+            },
+            "id": "send-week-followup",
+            "name": "Send 1-Week Follow-up",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1120, 700],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "success@yourcompany.com",
+              "toEmail": "={{ $json.candidate_email }}",
+              "subject": "📊 One month in - how are things going?",
+              "text": "=Hi {{ $json.candidate_name }},\n\nCan you believe it's been a month already at {{ $json.client_company }}? Time flies! 🚀\n\nWe'd love to hear how things are progressing in your role as {{ $json.position_title }}.\n\n🎯 We're curious about:\n• How you're finding the company culture\n• Your biggest wins so far\n• Any areas where you'd like more support\n• Overall satisfaction with the role (1-10 scale)\n\nYour feedback helps us ensure we're making great matches for future candidates too.\n\nWould you be up for a quick 10-minute call this week? Or feel free to just reply to this email.\n\nProud of your progress!\n\nBest regards,\n{{ $json.recruiter_name || 'Your Recruitment Team' }}"
+            },
+            "id": "send-month-followup",
+            "name": "Send 1-Month Follow-up",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1120, 800],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "success@yourcompany.com",
+              "toEmail": "={{ $json.candidate_email }},{{ $json.client_email }}",
+              "subject": "🎉 90-Day Guarantee Period Complete - Congratulations!",
+              "text": "=Hi {{ $json.candidate_name }} and {{ $json.client_contact_name }},\n\nCongratulations! 🎉 Today marks the end of the 90-day guarantee period for {{ $json.candidate_name }}'s placement as {{ $json.position_title }}.\n\nThis milestone represents:\n✅ Successful integration into the team\n✅ Meeting performance expectations\n✅ A great cultural fit\n✅ Another successful placement partnership\n\n📊 Quick Feedback Request:\nTo help us continue improving our service:\n\n{{ $json.candidate_name }}: How would you rate your overall experience? (1-10)\n{{ $json.client_contact_name }}: How satisfied are you with this placement? (1-10)\n\n🤝 Looking Ahead:\n• {{ $json.candidate_name }}: We're here if you ever need career advice or opportunities\n• {{ $json.client_contact_name }}: Ready to help with your next hiring needs\n\nThank you both for making this a successful partnership!\n\nBest regards,\n{{ $json.recruiter_name || 'Your Recruitment Team' }}"
+            },
+            "id": "send-guarantee-completion",
+            "name": "Send Guarantee Completion",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1120, 900],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          }
+        ],
+        "connections": {
+          "webhook-placement-completed": {
+            "main": [
+              [
+                {
+                  "node": "calculate-placement-metrics",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "calculate-placement-metrics": {
+            "main": [
+              [
+                {
+                  "node": "save-placement-record",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "save-placement-record": {
+            "main": [
+              [
+                {
+                  "node": "update-candidate-status",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "update-candidate-status": {
+            "main": [
+              [
+                {
+                  "node": "update-client-revenue",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "update-client-revenue": {
+            "main": [
+              [
+                {
+                  "node": "send-candidate-congratulations",
+                  "type": "main",
+                  "index": 0
+                },
+                {
+                  "node": "send-client-completion",
+                  "type": "main",
+                  "index": 0
+                },
+                {
+                  "node": "send-internal-notification",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "cron-followup-schedule": {
+            "main": [
+              [
+                {
+                  "node": "get-recent-placements",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "get-recent-placements": {
+            "main": [
+              [
+                {
+                  "node": "filter-followup-placements",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "filter-followup-placements": {
+            "main": [
+              [
+                {
+                  "node": "route-followup-type",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "route-followup-type": {
+            "main": [
+              [
+                {
+                  "node": "send-week-followup",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "send-month-followup",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "send-guarantee-completion",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "googleSheetsStructure": {
+    "sheetName": "Recruitment Analytics Master",
+    "tabs": [
+      {
+        "name": "Candidate Master",
+        "headers": [
+          "candidate_id", "name", "email", "phone", "source", "application_date",
+          "ai_score", "ai_reasoning", "strengths", "concerns", "next_action",
+          "current_stage", "stage_entry_date", "previous_stage", "recruiter_assigned",
+          "client_matched", "interview_date", "offer_status", "placement_date",
+          "feedback_score", "commission_value", "final_salary", "status"
+        ]
+      },
+      {
+        "name": "Client Master", 
+        "headers": [
+          "client_id", "company_name", "contact_name", "email", "job_title",
+          "industry", "company_size", "first_contact", "current_stage", "positions_filled",
+          "total_revenue", "last_interaction", "next_action", "relationship_strength",
+          "contract_status", "lead_score", "email_sequence_step", "campaign_status",
+          "last_placement"
+        ]
+      },
+      {
+        "name": "Daily Activity Log",
+        "headers": [
+          "timestamp", "activity_type", "candidate_id", "client_id", "stage_change",
+          "interaction_type", "outcome", "notes", "value_generated", "next_action_required"
+        ]
+      },
+      {
+        "name": "Performance Metrics",
+        "headers": [
+          "date", "total_applications_today", "total_applications_week", "total_applications_month",
+          "qualified_candidates", "high_score_candidates", "average_ai_score", "interviews_scheduled",
+          "offers_made", "placements_completed", "total_prospects", "active_clients",
+          "new_leads_today", "new_leads_week", "hot_prospects", "warm_prospects",
+          "cold_prospects", "total_revenue", "monthly_revenue", "average_placement_value",
+          "pipeline_value", "total_activities_today", "candidate_activities", "client_activities",
+          "emails_sent", "meetings_held", "conversion_application_to_qualified",
+          "conversion_qualified_to_interview", "conversion_interview_to_offer", "conversion_offer_to_placement"
+        ]
+      },
+      {
+        "name": "Placements",
+        "headers": [
+          "placement_id", "candidate_id", "client_id", "recruiter_id", "position_title",
+          "annual_salary", "commission_rate", "placement_fee", "agency_commission",
+          "recruiter_commission", "placement_date", "start_date", "days_to_placement",
+          "guarantee_period", "client_satisfaction", "candidate_satisfaction", "status",
+          "payment_status", "invoice_sent"
+        ]
+      },
+      {
+        "name": "Dashboard Data",
+        "headers": [
+          "metric_name", "metric_value", "category", "last_updated", "trend_direction",
+          "previous_value", "percentage_change"
+        ]
+      }
+    ]
+  },
+  "setupInstructions": {
+    "credentials": [
+      "OpenAI API - For AI candidate scoring and email personalization",
+      "Google Sheets OAuth2 - For data storage and tracking",
+      "SMTP Email - For automated communications",
+      "Smartlead API - For cold email campaigns (optional)",
+      "Hunter.io API - For email enrichment (optional)"
+    ],
+    "webhookEndpoints": [
+      "/candidate-application - For new candidate submissions",
+      "/stage-progression - For candidate pipeline updates", 
+      "/new-prospect - For lead generation",
+      "/client-interaction - For client relationship updates",
+      "/placement-completed - For successful placements",
+      "/trigger-dashboard-update - For dashboard refreshes"
+    ],
+    "configurations": [
+      "Update all email addresses in email nodes",
+      "Replace API keys and campaign IDs in HTTP request nodes",
+      "Set Google Sheet IDs in all Google Sheets nodes",
+      "Configure Looker Studio dashboard ID for reporting",
+      "Customize AI prompts for your specific requirements",
+      "Set up cron schedules based on your business hours"
+    ]
+  }
+}{
+  "workflows": [
+    {
+      "name": "1. Candidate Pipeline Management",
+      "description": "Complete 7-stage candidate pipeline with AI scoring and automated progression",
+      "workflow": {
+        "name": "Candidate Pipeline Management",
+        "nodes": [
+          {
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "candidate-application",
+              "responseMode": "responseNode",
+              "options": {}
+            },
+            "id": "webhook-candidate-application",
+            "name": "New Candidate Application",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [240, 300],
+            "webhookId": "candidate-application"
+          },
+          {
+            "parameters": {
+              "jsCode": "// Generate unique candidate ID and set initial data\nconst candidateData = $input.first().json;\nconst candidateId = 'CAND_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5).toUpperCase();\n\nconst enrichedData = {\n  ...candidateData,\n  candidate_id: candidateId,\n  application_date: new Date().toISOString(),\n  current_stage: 'Stage 1: Application Review',\n  stage_entry_date: new Date().toISOString(),\n  ai_score: null,\n  recruiter_assigned: 'unassigned',\n  client_matched: null,\n  interview_date: null,\n  offer_status: null,\n  placement_date: null,\n  feedback_score: null,\n  commission_value: null,\n  source: candidateData.source || 'website',\n  status: 'active'\n};\n\nreturn [{ json: enrichedData }];"
+            },
+            "id": "enrich-candidate-data",
+            "name": "Enrich Candidate Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [460, 300]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "append",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Candidate Master",
+                "mode": "list"
+              },
+              "columnRow": "A1",
+              "dataMode": "autoMapInputData"
+            },
+            "id": "add-to-candidate-master",
+            "name": "Add to Candidate Master",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [680, 300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "model": "gpt-4",
+              "options": {
+                "temperature": 0.2,
+                "maxTokens": 200
+              },
+              "messages": {
+                "values": [
+                  {
+                    "role": "system",
+                    "content": "You are an expert recruitment AI. Score candidates 1-10 based on: Experience relevance (30%), Skills match (25%), Cultural fit indicators (20%), Career progression (15%), Communication quality (10%). Return JSON: {\"score\": number, \"reasoning\": \"brief explanation\", \"strengths\": [\"strength1\", \"strength2\"], \"concerns\": [\"concern1\"], \"next_action\": \"recommended next step\"}"
+                  },
+                  {
+                    "role": "user",
+                    "content": "=Position: {{ $json.position }}\nExperience: {{ $json.experience }}\nSkills: {{ $json.skills }}\nEducation: {{ $json.education }}\nCover Letter: {{ $json.cover_letter }}\nSalary Expectations: {{ $json.salary_expectations }}\nAvailability: {{ $json.availability }}"
+                  }
+                ]
+              }
+            },
+            "id": "ai-candidate-assessment",
+            "name": "AI Candidate Assessment",
+            "type": "@n8n/n8n-nodes-langchain.openAi",
+            "typeVersion": 1,
+            "position": [900, 300],
+            "credentials": {
+              "openAiApi": {
+                "id": "",
+                "name": "OpenAI API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "excellent-candidate",
+                    "leftValue": "={{ JSON.parse($json.choices[0].message.content).score }}",
+                    "rightValue": 8,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  },
+                  {
+                    "id": "good-candidate",
+                    "leftValue": "={{ JSON.parse($json.choices[0].message.content).score }}",
+                    "rightValue": 6,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  },
+                  {
+                    "id": "average-candidate",
+                    "leftValue": "={{ JSON.parse($json.choices[0].message.content).score }}",
+                    "rightValue": 4,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "fallbackOutput": "extra"
+            },
+            "id": "route-by-score",
+            "name": "Route by AI Score",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3,
+            "position": [1120, 300]
+          },
+          {
+            "parameters": {
+              "fromEmail": "talent@yourcompany.com",
+              "toEmail": "={{ $('add-to-candidate-master').item.json.email }}",
+              "subject": "🚀 Exciting Opportunity - Immediate Next Steps",
+              "text": "=Hi {{ $('add-to-candidate-master').item.json.name }},\n\nFantastic news! Your application for {{ $('add-to-candidate-master').item.json.position }} has caught our attention.\n\nYour profile shows excellent potential, and we'd love to fast-track your application.\n\n📋 Next Steps (Please complete within 24 hours):\n1. Skills Assessment: {{ $json.assessment_link || 'Link will be provided' }}\n2. 2-minute video introduction: {{ $json.video_link || 'Link will be provided' }}\n3. Schedule screening call: {{ $json.calendar_link || 'Link will be provided' }}\n\nWe're excited to learn more about you!\n\nBest regards,\n{{ $json.recruiter_name || 'Talent Team' }}\n{{ $json.company_name || 'Recruitment Agency' }}"
+            },
+            "id": "email-excellent-candidates",
+            "name": "Email Excellent Candidates",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1340, 200],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "talent@yourcompany.com",
+              "toEmail": "={{ $('add-to-candidate-master').item.json.email }}",
+              "subject": "Application Received - Next Steps",
+              "text": "=Hi {{ $('add-to-candidate-master').item.json.name }},\n\nThank you for applying for {{ $('add-to-candidate-master').item.json.position }}!\n\nWe've received your application and are impressed by your background.\n\n📋 Next Steps:\n1. Complete our skills assessment: {{ $json.assessment_link || 'Link will be provided' }}\n2. We'll review and be in touch within 2-3 business days\n\nWe appreciate your interest and look forward to learning more about you.\n\nBest regards,\nTalent Team"
+            },
+            "id": "email-good-candidates",
+            "name": "Email Good Candidates",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1340, 300],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "talent@yourcompany.com",
+              "toEmail": "={{ $('add-to-candidate-master').item.json.email }}",
+              "subject": "Application Under Review",
+              "text": "=Hi {{ $('add-to-candidate-master').item.json.name }},\n\nThank you for your interest in {{ $('add-to-candidate-master').item.json.position }}.\n\nWe're currently reviewing all applications and will update you on next steps within 5 business days.\n\nWe appreciate your patience during our review process.\n\nBest regards,\nTalent Team"
+            },
+            "id": "email-average-candidates",
+            "name": "Email Average Candidates",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1340, 400],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "talent@yourcompany.com",
+              "toEmail": "={{ $('add-to-candidate-master').item.json.email }}",
+              "subject": "Application Status Update",
+              "text": "=Hi {{ $('add-to-candidate-master').item.json.name }},\n\nThank you for your interest in {{ $('add-to-candidate-master').item.json.position }}.\n\nAfter careful consideration, we've decided to move forward with candidates whose experience more closely aligns with our current requirements.\n\nWe'll keep your profile on file for future opportunities that may be a better match.\n\nThank you for your time and interest.\n\nBest regards,\nTalent Team"
+            },
+            "id": "email-low-candidates",
+            "name": "Email Low Score Candidates",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1340, 500],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "update",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Candidate Master",
+                "mode": "list"
+              },
+              "whereCondition": "=candidate_id={{ $('add-to-candidate-master').item.json.candidate_id }}",
+              "columnRow": "A1",
+              "dataMode": "define",
+              "valueInputMode": "define",
+              "fieldsUi": {
+                "values": [
+                  {
+                    "column": "ai_score",
+                    "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).score }}"
+                  },
+                  {
+                    "column": "ai_reasoning",
+                    "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).reasoning }}"
+                  },
+                  {
+                    "column": "strengths",
+                    "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).strengths.join(', ') }}"
+                  },
+                  {
+                    "column": "concerns",
+                    "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).concerns.join(', ') }}"
+                  },
+                  {
+                    "column": "next_action",
+                    "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).next_action }}"
+                  }
+                ]
+              }
+            },
+            "id": "update-candidate-score",
+            "name": "Update Candidate Score",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [1560, 350],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "stage-progression",
+              "responseMode": "responseNode",
+              "options": {}
+            },
+            "id": "webhook-stage-progression",
+            "name": "Stage Progression Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [240, 800],
+            "webhookId": "stage-progression"
+          },
+          {
+            "parameters": {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "stage-2",
+                    "leftValue": "={{ $json.new_stage }}",
+                    "rightValue": "Stage 2: Skills Assessment",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "stage-3", 
+                    "leftValue": "={{ $json.new_stage }}",
+                    "rightValue": "Stage 3: Video Interview",
+                    "operator": {
+                      "type": "string", 
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "stage-4",
+                    "leftValue": "={{ $json.new_stage }}",
+                    "rightValue": "Stage 4: Client Presentation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "stage-5",
+                    "leftValue": "={{ $json.new_stage }}",
+                    "rightValue": "Stage 5: Client Interview",
+                    "operator": {
+                      "type": "string", 
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "stage-6",
+                    "leftValue": "={{ $json.new_stage }}",
+                    "rightValue": "Stage 6: Final Interview",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals" 
+                    }
+                  },
+                  {
+                    "id": "stage-7",
+                    "leftValue": "={{ $json.new_stage }}",
+                    "rightValue": "Stage 7: Offer & Placement",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "fallbackOutput": "extra"
+            },
+            "id": "route-stage-progression",
+            "name": "Route Stage Progression",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3,
+            "position": [460, 800]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "update",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Candidate Master",
+                "mode": "list"
+              },
+              "whereCondition": "=candidate_id={{ $json.candidate_id }}",
+              "columnRow": "A1",
+              "dataMode": "define",
+              "valueInputMode": "define",
+              "fieldsUi": {
+                "values": [
+                  {
+                    "column": "current_stage",
+                    "fieldValue": "={{ $json.new_stage }}"
+                  },
+                  {
+                    "column": "stage_entry_date",
+                    "fieldValue": "={{ $now }}"
+                  },
+                  {
+                    "column": "previous_stage",
+                    "fieldValue": "={{ $json.previous_stage }}"
+                  }
+                ]
+              }
+            },
+            "id": "update-candidate-stage",
+            "name": "Update Candidate Stage",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [680, 800],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "append",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Daily Activity Log",
+                "mode": "list"
+              },
+              "columnRow": "A1",
+              "dataMode": "define",
+              "valueInputMode": "define",
+              "fieldsUi": {
+                "values": [
+                  {
+                    "column": "timestamp",
+                    "fieldValue": "={{ $now }}"
+                  },
+                  {
+                    "column": "activity_type",
+                    "fieldValue": "candidate_stage_progression"
+                  },
+                  {
+                    "column": "candidate_id",
+                    "fieldValue": "={{ $json.candidate_id }}"
+                  },
+                  {
+                    "column": "stage_change",
+                    "fieldValue": "={{ $json.previous_stage }} → {{ $json.new_stage }}"
+                  },
+                  {
+                    "column": "outcome",
+                    "fieldValue": "={{ $json.outcome || 'Progressed' }}"
+                  },
+                  {
+                    "column": "notes",
+                    "fieldValue": "={{ $json.notes || 'Automated stage progression' }}"
+                  }
+                ]
+              }
+            },
+            "id": "log-stage-activity",
+            "name": "Log Stage Activity",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [900, 800],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          }
+        ],
+        "connections": {
+          "webhook-candidate-application": {
+            "main": [
+              [
+                {
+                  "node": "enrich-candidate-data",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "enrich-candidate-data": {
+            "main": [
+              [
+                {
+                  "node": "add-to-candidate-master",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "add-to-candidate-master": {
+            "main": [
+              [
+                {
+                  "node": "ai-candidate-assessment",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "ai-candidate-assessment": {
+            "main": [
+              [
+                {
+                  "node": "route-by-score",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "route-by-score": {
+            "main": [
+              [
+                {
+                  "node": "email-excellent-candidates",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "email-good-candidates",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "email-average-candidates",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "email-low-candidates",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "email-excellent-candidates": {
+            "main": [
+              [
+                {
+                  "node": "update-candidate-score",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "email-good-candidates": {
+            "main": [
+              [
+                {
+                  "node": "update-candidate-score",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "email-average-candidates": {
+            "main": [
+              [
+                {
+                  "node": "update-candidate-score",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "email-low-candidates": {
+            "main": [
+              [
+                {
+                  "node": "update-candidate-score",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "webhook-stage-progression": {
+            "main": [
+              [
+                {
+                  "node": "route-stage-progression",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "route-stage-progression": {
+            "main": [
+              [
+                {
+                  "node": "update-candidate-stage",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "update-candidate-stage",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "update-candidate-stage",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "update-candidate-stage",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "update-candidate-stage",
+                  "type": "main",
+                  "index": 0
+                }
+              ],
+              [
+                {
+                  "node": "update-candidate-stage",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "update-candidate-stage": {
+            "main": [
+              [
+                {
+                  "node": "log-stage-activity",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "2. Advanced Lead Generation & Client Management",
+      "description": "Multi-touch email campaigns, client scoring, and relationship management",
+      "workflow": {
+        "name": "Advanced Lead Generation & Client Management",
+        "nodes": [
+          {
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "new-prospect",
+              "responseMode": "responseNode",
+              "options": {}
+            },
+            "id": "webhook-new-prospect",
+            "name": "New Prospect Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [240, 300],
+            "webhookId": "new-prospect"
+          },
+          {
+            "parameters": {
+              "jsCode": "// Enrich prospect data and generate client ID\nconst prospectData = $input.first().json;\nconst clientId = 'CLIENT_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5).toUpperCase();\n\n// Calculate company scoring factors\nconst companySizeScore = {\n  '1-10': 3,\n  '11-50': 5,\n  '51-200': 7,\n  '201-1000': 8,\n  '1000+': 9\n};\n\nconst industryScore = {\n  'Technology': 9,\n  'Finance': 8,\n  'Healthcare': 7,\n  'Manufacturing': 6,\n  'Retail': 5,\n  'Other': 4\n};\n\nconst baseScore = (companySizeScore[prospectData.company_size] || 5) + \n                 (industryScore[prospectData.industry] || 5);\n\nconst enrichedProspect = {\n  ...prospectData,\n  client_id: clientId,\n  first_contact: new Date().toISOString(),\n  current_stage: 'Cold Lead',\n  positions_filled: 0,\n  total_revenue: 0,\n  last_interaction: new Date().toISOString(),\n  next_action: 'Initial outreach',\n  relationship_strength: 'Cold',\n  contract_status: 'Prospecting',\n  lead_score: baseScore,\n  email_sequence_step: 1,\n  campaign_status: 'active'\n};\n\nreturn [{ json: enrichedProspect }];"
+            },
+            "id": "enrich-prospect-data",
+            "name": "Enrich Prospect Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [460, 300]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "append",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Client Master",
+                "mode": "list"
+              },
+              "columnRow": "A1",
+              "dataMode": "autoMapInputData"
+            },
+            "id": "add-to-client-master",
+            "name": "Add to Client Master",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [680, 300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "authentication": "genericCredentialType",
+              "genericAuthType": "httpBasicAuth",
+              "requestMethod": "GET",
+              "url": "=https://api.hunter.io/v2/domain-search?domain={{ $json.company_domain }}&api_key=YOUR_HUNTER_API_KEY&limit=5"
+            },
+            "id": "hunter-email-enrichment",
+            "name": "Hunter Email Enrichment",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [900, 300]
+          },
+          {
+            "parameters": {
+              "model": "gpt-4",
+              "options": {
+                "temperature": 0.8,
+                "maxTokens": 400
+              },
+              "messages": {
+                "values": [
+                  {
+                    "role": "system",
+                    "content": "You are an expert cold email copywriter for recruitment services. Create highly personalized, compelling cold emails that get responses. Focus on value proposition and social proof. Return JSON with 'subject', 'body', and 'call_to_action' fields."
+                  },
+                  {
+                    "role": "user",
+                    "content": "=Company: {{ $('add-to-client-master').item.json.company_name }}\nContact: {{ $('add-to-client-master').item.json.contact_name }}\nTitle: {{ $('add-to-client-master').item.json.job_title }}\nIndustry: {{ $('add-to-client-master').item.json.industry }}\nCompany Size: {{ $('add-to-client-master').item.json.company_size }}\nRecent News: {{ $json.recent_news || 'No recent news found' }}\nEmail Sequence Step: {{ $('add-to-client-master').item.json.email_sequence_step }}\n\nCreate email #{{ $('add-to-client-master').item.json.email_sequence_step }} for this prospect. Make it highly personalized and valuable."
+                  }
+                ]
+              }
+            },
+            "id": "ai-personalize-email",
+            "name": "AI Personalized Email Generation",
+            "type": "@n8n/n8n-nodes-langchain.openAi",
+            "typeVersion": 1,
+            "position": [1120, 300],
+            "credentials": {
+              "openAiApi": {
+                "id": "",
+                "name": "OpenAI API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "authentication": "genericCredentialType",
+              "genericAuthType": "httpHeaderAuth",
+              "requestMethod": "POST",
+              "url": "https://server.smartlead.ai/api/v1/campaigns/CAMPAIGN_ID/leads",
+              "sendHeaders": true,
+              "headerParameters": {
+                "parameters": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "name": "X-Api-Key",
+                    "value": "YOUR_SMARTLEAD_API_KEY"
+                  }
+                ]
+              },
+              "sendBody": true,
+              "contentType": "json",
+              "jsonBody": "={\n  \"email\": \"{{ $('add-to-client-master').item.json.email }}\",\n  \"firstName\": \"{{ $('add-to-client-master').item.json.first_name }}\",\n  \"lastName\": \"{{ $('add-to-client-master').item.json.last_name }}\",\n  \"companyName\": \"{{ $('add-to-client-master').item.json.company_name }}\",\n  \"customFields\": {\n    \"subject\": \"{{ JSON.parse($('ai-personalize-email').item.json.choices[0].message.content).subject }}\",\n    \"body\": \"{{ JSON.parse($('ai-personalize-email').item.json.choices[0].message.content).body }}\",\n    \"call_to_action\": \"{{ JSON.parse($('ai-personalize-email').item.json.choices[0].message.content).call_to_action }}\",\n    \"sequence_step\": \"{{ $('add-to-client-master').item.json.email_sequence_step }}\"\n  }\n}"
+            },
+            "id": "smartlead-add-to-campaign",
+            "name": "Add to Smartlead Campaign",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [1340, 300]
+          },
+          {
+            "parameters": {
+              "rule": {
+                "interval": [
+                  {
+                    "field": "cronExpression",
+                    "expression": "0 10,14,17 * * 1-5"
+                  }
+                ]
+              }
+            },
+            "id": "cron-follow-up-sequence",
+            "name": "Follow-up Sequence Trigger",
+            "type": "n8n-nodes-base.cron",
+            "typeVersion": 1,
+            "position": [240, 800]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "read",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Client Master",
+                "mode": "list"
+              },
+              "options": {
+                "range": {
+                  "rangeProperties": {
+                    "fromColumn": "A",
+                    "toColumn": "Z"
+                  }
+                }
+              }
+            },
+            "id": "get-prospects-for-followup",
+            "name": "Get Prospects for Follow-up",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [460, 800],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "jsCode": "// Filter prospects who need follow-up emails\nconst allProspects = $input.all();\nconst now = new Date();\nconst followUpCandidates = [];\n\nfor (const item of allProspects) {\n  const prospect = item.json;\n  \n  // Skip if not active campaign\n  if (prospect.campaign_status !== 'active') continue;\n  \n  // Check if enough time has passed for next email\n  const lastInteraction = new Date(prospect.last_interaction);\n  const daysSinceLastEmail = Math.floor((now - lastInteraction) / (1000 * 60 * 60 * 24));\n  \n  // Follow-up schedule: Day 3, 7, 14, 30\n  const followUpSchedule = {\n    1: 3,   // First follow-up after 3 days\n    2: 7,   // Second follow-up after 7 days\n    3: 14,  // Third follow-up after 14 days\n    4: 30   // Final follow-up after 30 days\n  };\n  \n  const nextStep = prospect.email_sequence_step + 1;\n  \n  if (nextStep <= 4 && daysSinceLastEmail >= followUpSchedule[prospect.email_sequence_step]) {\n    followUpCandidates.push({\n      json: {\n        ...prospect,\n        next_email_step: nextStep,\n        days_since_last: daysSinceLastEmail\n      }\n    });\n  }\n}\n\nreturn followUpCandidates;"
+            },
+            "id": "filter-followup-prospects",
+            "name": "Filter Follow-up Prospects",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [680, 800]
+          },
+          {
+            "parameters": {
+              "model": "gpt-4",
+              "options": {
+                "temperature": 0.7,
+                "maxTokens": 350
+              },
+              "messages": {
+                "values": [
+                  {
+                    "role": "system",
+                    "content": "You are an expert at follow-up email sequences for recruitment services. Create compelling follow-up emails that provide value and don't sound pushy. Each email should have a different angle: Email 2 = Case study/social proof, Email 3 = Industry insights/value, Email 4 = Final attempt with urgency. Return JSON with 'subject', 'body', and 'call_to_action'."
+                  },
+                  {
+                    "role": "user",
+                    "content": "=Company: {{ $json.company_name }}\nContact: {{ $json.contact_name }}\nIndustry: {{ $json.industry }}\nFollow-up Email #: {{ $json.next_email_step }}\nDays since last email: {{ $json.days_since_last }}\n\nCreate follow-up email #{{ $json.next_email_step }} with a fresh angle and value proposition."
+                  }
+                ]
+              }
+            },
+            "id": "ai-followup-email",
+            "name": "AI Follow-up Email Generation", 
+            "type": "@n8n/n8n-nodes-langchain.openAi",
+            "typeVersion": 1,
+            "position": [900, 800],
+            "credentials": {
+              "openAiApi": {
+                "id": "",
+                "name": "OpenAI API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "fromEmail": "business@yourcompany.com",
+              "toEmail": "={{ $json.email }}",
+              "subject": "={{ JSON.parse($('ai-followup-email').item.json.choices[0].message.content).subject }}",
+              "text": "={{ JSON.parse($('ai-followup-email').item.json.choices[0].message.content).body }}"
+            },
+            "id": "send-followup-email",
+            "name": "Send Follow-up Email",
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2,
+            "position": [1120, 800],
+            "credentials": {
+              "smtp": {
+                "id": "",
+                "name": "SMTP Email"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "update",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Client Master",
+                "mode": "list"
+              },
+              "whereCondition": "=client_id={{ $json.client_id }}",
+              "columnRow": "A1",
+              "dataMode": "define",
+              "valueInputMode": "define",
+              "fieldsUi": {
+                "values": [
+                  {
+                    "column": "email_sequence_step",
+                    "fieldValue": "={{ $json.next_email_step }}"
+                  },
+                  {
+                    "column": "last_interaction",
+                    "fieldValue": "={{ $now }}"
+                  },
+                  {
+                    "column": "next_action",
+                    "fieldValue": "=Waiting for response to follow-up #{{ $json.next_email_step }}"
+                  }
+                ]
+              }
+            },
+            "id": "update-followup-status",
+            "name": "Update Follow-up Status",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [1340, 800],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "client-interaction",
+              "responseMode": "responseNode",
+              "options": {}
+            },
+            "id": "webhook-client-interaction",
+            "name": "Client Interaction Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [240, 1300],
+            "webhookId": "client-interaction"
+          },
+          {
+            "parameters": {
+              "jsCode": "// Calculate updated client relationship score\nconst interaction = $input.first().json;\n\n// Scoring factors\nconst interactionScores = {\n  'email_reply': 5,\n  'meeting_booked': 15,\n  'meeting_attended': 20,\n  'proposal_requested': 25,\n  'contract_signed': 50,\n  'job_posted': 30,\n  'candidate_hired': 40,\n  'referral_given': 35\n};\n\nconst sentimentScores = {\n  'positive': 1.2,\n  'neutral': 1.0,\n  'negative': 0.7\n};\n\nconst baseScore = interactionScores[interaction.interaction_type] || 5;\nconst sentimentMultiplier = sentimentScores[interaction.sentiment] || 1.0;\nconst finalScore = Math.round(baseScore * sentimentMultiplier);\n\n// Determine relationship strength\nlet relationshipStrength = 'Cold';\nif (finalScore >= 40) relationshipStrength = 'Hot';\nelse if (finalScore >= 20) relationshipStrength = 'Warm';\nelse if (finalScore >= 10) relationshipStrength = 'Lukewarm';\n\n// Determine next action\nlet nextAction = 'Follow up via email';\nif (interaction.interaction_type === 'meeting_attended') nextAction = 'Send proposal';\nelse if (interaction.interaction_type === 'proposal_requested') nextAction = 'Prepare and send contract';\nelse if (interaction.interaction_type === 'contract_signed') nextAction = 'Begin candidate sourcing';\n\nconst enrichedInteraction = {\n  ...interaction,\n  interaction_score: finalScore,\n  relationship_strength: relationshipStrength,\n  next_action: nextAction,\n  interaction_date: new Date().toISOString()\n};\n\nreturn [{ json: enrichedInteraction }];"
+            },
+            "id": "score-client-interaction",
+            "name": "Score Client Interaction",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [460, 1300]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "update",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Client Master",
+                "mode": "list"
+              },
+              "whereCondition": "=client_id={{ $json.client_id }}",
+              "columnRow": "A1",
+              "dataMode": "define",
+              "valueInputMode": "define",
+              "fieldsUi": {
+                "values": [
+                  {
+                    "column": "relationship_strength",
+                    "fieldValue": "={{ $json.relationship_strength }}"
+                  },
+                  {
+                    "column": "last_interaction",
+                    "fieldValue": "={{ $json.interaction_date }}"
+                  },
+                  {
+                    "column": "next_action",
+                    "fieldValue": "={{ $json.next_action }}"
+                  },
+                  {
+                    "column": "current_stage",
+                    "fieldValue": "={{ $json.new_stage || $json.current_stage }}"
+                  }
+                ]
+              }
+            },
+            "id": "update-client-relationship",
+            "name": "Update Client Relationship",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [680, 1300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "append",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Daily Activity Log",
+                "mode": "list"
+              },
+              "columnRow": "A1",
+              "dataMode": "define",
+              "valueInputMode": "define",
+              "fieldsUi": {
+                "values": [
+                  {
+                    "column": "timestamp",
+                    "fieldValue": "={{ $json.interaction_date }}"
+                  },
+                  {
+                    "column": "activity_type",
+                    "fieldValue": "client_interaction"
+                  },
+                  {
+                    "column": "client_id",
+                    "fieldValue": "={{ $json.client_id }}"
+                  },
+                  {
+                    "column": "interaction_type",
+                    "fieldValue": "={{ $json.interaction_type }}"
+                  },
+                  {
+                    "column": "outcome",
+                    "fieldValue": "={{ $json.outcome }}"
+                  },
+                  {
+                    "column": "notes",
+                    "fieldValue": "={{ $json.notes }}"
+                  },
+                  {
+                    "column": "value_generated",
+                    "fieldValue": "={{ $json.value_generated || 0 }}"
+                  },
+                  {
+                    "column": "next_action_required",
+                    "fieldValue": "={{ $json.next_action }}"
+                  }
+                ]
+              }
+            },
+            "id": "log-client-interaction",
+            "name": "Log Client Interaction",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [900, 1300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          }
+        ],
+        "connections": {
+          "webhook-new-prospect": {
+            "main": [
+              [
+                {
+                  "node": "enrich-prospect-data",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "enrich-prospect-data": {
+            "main": [
+              [
+                {
+                  "node": "add-to-client-master",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "add-to-client-master": {
+            "main": [
+              [
+                {
+                  "node": "hunter-email-enrichment",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "hunter-email-enrichment": {
+            "main": [
+              [
+                {
+                  "node": "ai-personalize-email",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "ai-personalize-email": {
+            "main": [
+              [
+                {
+                  "node": "smartlead-add-to-campaign",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "cron-follow-up-sequence": {
+            "main": [
+              [
+                {
+                  "node": "get-prospects-for-followup",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "get-prospects-for-followup": {
+            "main": [
+              [
+                {
+                  "node": "filter-followup-prospects",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "filter-followup-prospects": {
+            "main": [
+              [
+                {
+                  "node": "ai-followup-email",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "ai-followup-email": {
+            "main": [
+              [
+                {
+                  "node": "send-followup-email",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "send-followup-email": {
+            "main": [
+              [
+                {
+                  "node": "update-followup-status",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "webhook-client-interaction": {
+            "main": [
+              [
+                {
+                  "node": "score-client-interaction",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "score-client-interaction": {
+            "main": [
+              [
+                {
+                  "node": "update-client-relationship",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          },
+          "update-client-relationship": {
+            "main": [
+              [
+                {
+                  "node": "log-client-interaction",
+                  "type": "main",
+                  "index": 0
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "3. Comprehensive Analytics & Reporting System",
+      "description": "Real-time metrics collection, AI insights, and automated dashboard updates",
+      "workflow": {
+        "name": "Comprehensive Analytics & Reporting System",
+        "nodes": [
+          {
+            "parameters": {
+              "rule": {
+                "interval": [
+                  {
+                    "field": "cronExpression",
+                    "expression": "0 8 * * 1-5"
+                  }
+                ]
+              }
+            },
+            "id": "cron-daily-metrics",
+            "name": "Daily Metrics Collection",
+            "type": "n8n-nodes-base.cron",
+            "typeVersion": 1,
+            "position": [240, 300]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "read",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Candidate Master",
+                "mode": "list"
+              },
+              "options": {}
+            },
+            "id": "get-candidate-data",
+            "name": "Get Candidate Data",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [460, 200],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "read",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Client Master",
+                "mode": "list"
+              },
+              "options": {}
+            },
+            "id": "get-client-data",
+            "name": "Get Client Data",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [460, 300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "read",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Daily Activity Log",
+                "mode": "list"
+              },
+              "options": {}
+            },
+            "id": "get-activity-data",
+            "name": "Get Activity Data",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [460, 400],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "jsCode": "// Calculate comprehensive daily metrics\nconst candidateData = $('get-candidate-data').all();\nconst clientData = $('get-client-data').all();\nconst activityData = $('get-activity-data').all();\n\nconst today = new Date().toISOString().split('T')[0];\nconst yesterday = new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0];\nconst lastWeek = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];\nconst lastMonth = new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];\n\n// Calculate candidate metrics\nconst candidateMetrics = {\n  total_applications_today: candidateData.filter(c => c.json.application_date?.startsWith(today)).length,\n  total_applications_week: candidateData.filter(c => c.json.application_date >= lastWeek).length,\n  total_applications_month: candidateData.filter(c => c.json.application_date >= lastMonth).length,\n  qualified_candidates: candidateData.filter(c => c.json.ai_score >= 6).length,\n  high_score_candidates: candidateData.filter(c => c.json.ai_score >= 8).length,\n  interviews_scheduled: candidateData.filter(c => c.json.current_stage?.includes('Interview')).length,\n  offers_made: candidateData.filter(c => c.json.current_stage?.includes('Offer')).length,\n  placements_completed: candidateData.filter(c => c.json.current_stage === 'Placed').length,\n  average_ai_score: candidateData.length > 0 ? \n    (candidateData.reduce((sum, c) => sum + (parseFloat(c.json.ai_score) || 0), 0) / candidateData.length).toFixed(2) : 0\n};\n\n// Calculate pipeline conversion rates\nconst stageProgression = {\n  application_to_qualified: candidateMetrics.qualified_candidates / Math.max(candidateMetrics.total_applications_month, 1) * 100,\n  qualified_to_interview: candidateMetrics.interviews_scheduled / Math.max(candidateMetrics.qualified_candidates, 1) * 100,\n  interview_to_offer: candidateMetrics.offers_made / Math.max(candidateMetrics.interviews_scheduled, 1) * 100,\n  offer_to_placement: candidateMetrics.placements_completed / Math.max(candidateMetrics.offers_made, 1) * 100\n};\n\n// Calculate client metrics\nconst clientMetrics = {\n  total_prospects: clientData.length,\n  active_clients: clientData.filter(c => c.json.contract_status === 'Active').length,\n  new_leads_today: clientData.filter(c => c.json.first_contact?.startsWith(today)).length,\n  new_leads_week: clientData.filter(c => c.json.first_contact >= lastWeek).length,\n  hot_prospects: clientData.filter(c => c.json.relationship_strength === 'Hot').length,\n  warm_prospects: clientData.filter(c => c.json.relationship_strength === 'Warm').length,\n  cold_prospects: clientData.filter(c => c.json.relationship_strength === 'Cold').length\n};\n\n// Calculate revenue metrics\nconst revenueMetrics = {\n  total_revenue: clientData.reduce((sum, c) => sum + (parseFloat(c.json.total_revenue) || 0), 0),\n  monthly_revenue: candidateData\n    .filter(c => c.json.placement_date >= lastMonth)\n    .reduce((sum, c) => sum + (parseFloat(c.json.commission_value) || 0), 0),\n  average_placement_value: candidateMetrics.placements_completed > 0 ?\n    candidateData\n      .filter(c => c.json.current_stage === 'Placed')\n      .reduce((sum, c) => sum + (parseFloat(c.json.commission_value) || 0), 0) / candidateMetrics.placements_completed : 0,\n  pipeline_value: candidateData\n    .filter(c => c.json.current_stage !== 'Placed' && c.json.current_stage !== 'Rejected')\n    .reduce((sum, c) => sum + (parseFloat(c.json.estimated_commission) || 5000), 0)\n};\n\n// Calculate activity metrics\nconst todayActivities = activityData.filter(a => a.json.timestamp?.startsWith(today));\nconst activityMetrics = {\n  total_activities_today: todayActivities.length,\n  candidate_activities: todayActivities.filter(a => a.json.activity_type?.includes('candidate')).length,\n  client_activities: todayActivities.filter(a => a.json.activity_type?.includes('client')).length,\n  emails_sent: todayActivities.filter(a => a.json.activity_type === 'email_sent').length,\n  meetings_held: todayActivities.filter(a => a.json.activity_type === 'meeting_held').length\n};\n\n// Comprehensive metrics object\nconst comprehensiveMetrics = {\n  date: today,\n  ...candidateMetrics,\n  ...clientMetrics,\n  ...revenueMetrics,\n  ...activityMetrics,\n  conversion_rates: stageProgression,\n  timestamp: new Date().toISOString()\n};\n\nreturn [{ json: comprehensiveMetrics }];"
+            },
+            "id": "calculate-daily-metrics",
+            "name": "Calculate Daily Metrics",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [680, 300]
+          },
+          {
+            "parameters": {
+              "resource": "sheet",
+              "operation": "append",
+              "documentId": {
+                "__rl": true,
+                "value": "",
+                "mode": "list"
+              },
+              "sheetName": {
+                "__rl": true,
+                "value": "Performance Metrics",
+                "mode": "list"
+              },
+              "columnRow": "A1",
+              "dataMode": "autoMapInputData"
+            },
+            "id": "save-daily-metrics",
+            "name": "Save Daily Metrics",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [900, 300],
+            "credentials": {
+              "googleSheetsOAuth2Api": {
+                "id": "",
+                "name": "Google Sheets OAuth2 API"
+              }
+            }
+          },
+          {
+            "parameters": {
+              "model": "gpt-4",
+              "options": {
+                "temperature": 0.3,
+                "maxTokens": 1000
+              },
+              "messages": {
+                "values": [
+                  {
+                    "role": "system",
+                    "content": "You are an expert recruitment analytics consultant. Analyze the provided daily metrics and generate actionable insights, trends, and recommendations. Focus on: 1) Performance highlights, 2) Areas needing attention, 3) Specific action items, 4) Trend analysis, 5) Forecasting. Return well-structured HTML for email reporting."
+                  },
+                  {
+                    "role": "user",
+                    "content": "=Daily Recruitment Metrics for {{ $json.date }}:\n\nCANDIDATE PIPELINE:\n- Applications Today: {{ $json.total_applications_today }}\n- Applications This Week: {{ $json.total_applications_week }}\n- Applications This Month: {{ $json.total_applications_month }}\n- Qualified Candidates: {{ $json.qualified_candidates }}\n- High Score Candidates (8+): {{ $json.high_score_candidates }}\n- Average AI Score: {{ $json.average_ai_score }}\n- Interviews Scheduled: {{ $json.interviews_scheduled }}\n- Offers Made: {{ $json.offers_made }}\n- Placements Completed: {{ $json.placements_completed }}\n\nCONVERSION RATES:\n- Application to Qualified: {{ $json.conversion_rates.application_to_qualified }}%\n- Qualified to Interview: {{ $json.conversion_rates.qualified_to_interview }}%\n- Interview to Offer: {{ $json.conversion_rates.interview_to_offer }}%\n- Offer to Placement: {{ $json.conversion_rates.offer_to_placement }}%\n\nCLIENT METRICS:\n- Total Prospects: {{ $json.total_prospects }}\n- Active Clients: {{ $json
