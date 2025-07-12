@@ -1,0 +1,560 @@
+{
+  "name": "Candidate Pipeline Management",
+  "nodes": [
+    {
+      "id": "webhook-candidate-application",
+      "name": "New Candidate Application",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "candidate-application",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "candidate-application"
+    },
+    {
+      "id": "enrich-candidate-data",
+      "name": "Enrich Candidate Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "parameters": {
+        "jsCode": "// Generate unique candidate ID and set initial data\nconst candidateData = $input.first().json;\nconst candidateId = 'CAND_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5).toUpperCase();\n\nconst enrichedData = {\n  ...candidateData,\n  candidate_id: candidateId,\n  application_date: new Date().toISOString(),\n  current_stage: 'Stage 1: Application Review',\n  stage_entry_date: new Date().toISOString(),\n  ai_score: null,\n  recruiter_assigned: 'unassigned',\n  client_matched: null,\n  interview_date: null,\n  offer_status: null,\n  placement_date: null,\n  feedback_score: null,\n  commission_value: null,\n  source: candidateData.source || 'website',\n  status: 'active'\n};\n\nreturn [{ json: enrichedData }];"
+      }
+    },
+    {
+      "id": "add-to-candidate-master",
+      "name": "Add to Candidate Master",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [680, 300],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": "",
+        "sheetName": "Candidate Master",
+        "columnRow": "A1",
+        "dataMode": "autoMapInputData"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "id": "ai-candidate-assessment",
+      "name": "AI Candidate Assessment",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [900, 300],
+      "parameters": {
+        "model": "gpt-4",
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 200
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert recruitment AI. Score candidates 1-10 based on: Experience relevance (30%), Skills match (25%), Cultural fit (20%), Career progression (15%), Communication quality (10%). Return JSON:{\"score\":number,\"reasoning\":\"brief explanation\",\"strengths\":[\"str1\",\"str2\"],\"concerns\":[\"concern1\"],\"next_action\":\"recommended next step\"}"
+            },
+            {
+              "role": "user",
+              "content": "=Position: {{ $json.position }}\nExperience: {{ $json.experience }}\nSkills: {{ $json.skills }}\nEducation: {{ $json.education }}\nCover Letter: {{ $json.cover_letter }}\nSalary Expectations: {{ $json.salary_expectations }}\nAvailability: {{ $json.availability }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "id": "route-by-score",
+      "name": "Route by AI Score",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1120, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "excellent-candidate",
+              "leftValue": "={{ JSON.parse($json.choices[0].message.content).score }}",
+              "rightValue": 8,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "good-candidate",
+              "leftValue": "={{ JSON.parse($json.choices[0].message.content).score }}",
+              "rightValue": 6,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "average-candidate",
+              "leftValue": "={{ JSON.parse($json.choices[0].message.content).score }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "fallbackOutput": "extra"
+      }
+    },
+    {
+      "id": "email-excellent-candidates",
+      "name": "Email Excellent Candidates",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1340, 200],
+      "parameters": {
+        "fromEmail": "talent@yourcompany.com",
+        "toEmail": "={{ $('add-to-candidate-master').item.json.email }}",
+        "subject": "🚀 Exciting Opportunity – Immediate Next Steps",
+        "text": "=Hi {{ $('add-to-candidate-master').item.json.name }},\n\nFantastic news! Your application for {{ $('add-to-candidate-master').item.json.position }} has caught our attention..."
+      },
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "SMTP Email"
+        }
+      }
+    },
+    {
+      "id": "email-good-candidates",
+      "name": "Email Good Candidates",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "parameters": {
+        "fromEmail": "talent@yourcompany.com",
+        "toEmail": "={{ $('add-to-candidate-master').item.json.email }}",
+        "subject": "Application Received – Next Steps",
+        "text": "=Hi {{ $('add-to-candidate-master').item.json.name }},\n\nThank you for applying for {{ $('add-to-candidate-master').item.json.position }}..."
+      },
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "SMTP Email"
+        }
+      }
+    },
+    {
+      "id": "email-average-candidates",
+      "name": "Email Average Candidates",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1340, 400],
+      "parameters": {
+        "fromEmail": "talent@yourcompany.com",
+        "toEmail": "={{ $('add-to-candidate-master').item.json.email }}",
+        "subject": "Application Under Review",
+        "text": "=Hi {{ $('add-to-candidate-master').item.json.name }},\n\nWe’re currently reviewing all applications and will update you within 5 business days..."
+      },
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "SMTP Email"
+        }
+      }
+    },
+    {
+      "id": "email-low-candidates",
+      "name": "Email Low Score Candidates",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1340, 500],
+      "parameters": {
+        "fromEmail": "talent@yourcompany.com",
+        "toEmail": "={{ $('add-to-candidate-master').item.json.email }}",
+        "subject": "Application Status Update",
+        "text": "=Hi {{ $('add-to-candidate-master').item.json.name }},\n\nAfter careful consideration, we’ve decided to move forward with candidates whose experience more closely aligns with our requirements..."
+      },
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "SMTP Email"
+        }
+      }
+    },
+    {
+      "id": "update-candidate-score",
+      "name": "Update Candidate Score",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1560, 350],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": "",
+        "sheetName": "Candidate Master",
+        "whereCondition": "=candidate_id={{ $('add-to-candidate-master').item.json.candidate_id }}",
+        "columnRow": "A1",
+        "dataMode": "define",
+        "valueInputMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "ai_score",
+              "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).score }}"
+            },
+            {
+              "column": "ai_reasoning",
+              "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).reasoning }}"
+            },
+            {
+              "column": "strengths",
+              "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).strengths.join(', ') }}"
+            },
+            {
+              "column": "concerns",
+              "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).concerns.join(', ') }}"
+            },
+            {
+              "column": "next_action",
+              "fieldValue": "={{ JSON.parse($('ai-candidate-assessment').item.json.choices[0].message.content).next_action }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "id": "webhook-stage-progression",
+      "name": "Stage Progression Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 800],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stage-progression",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "stage-progression"
+    },
+    {
+      "id": "route-stage-progression",
+      "name": "Route Stage Progression",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [460, 800],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "stage-2",
+              "leftValue": "={{ $json.new_stage }}",
+              "rightValue": "Stage 2: Skills Assessment",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "stage-3",
+              "leftValue": "={{ $json.new_stage }}",
+              "rightValue": "Stage 3: Video Interview",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "stage-4",
+              "leftValue": "={{ $json.new_stage }}",
+              "rightValue": "Stage 4: Client Presentation",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "stage-5",
+              "leftValue": "={{ $json.new_stage }}",
+              "rightValue": "Stage 5: Client Interview",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "stage-6",
+              "leftValue": "={{ $json.new_stage }}",
+              "rightValue": "Stage 6: Final Interview",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "stage-7",
+              "leftValue": "={{ $json.new_stage }}",
+              "rightValue": "Stage 7: Offer & Placement",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "fallbackOutput": "extra"
+      }
+    },
+    {
+      "id": "update-candidate-stage",
+      "name": "Update Candidate Stage",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [680, 800],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": "",
+        "sheetName": "Candidate Master",
+        "whereCondition": "=candidate_id={{ $json.candidate_id }}",
+        "columnRow": "A1",
+        "dataMode": "define",
+        "valueInputMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "current_stage",
+              "fieldValue": "={{ $json.new_stage }}"
+            },
+            {
+              "column": "stage_entry_date",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "column": "previous_stage",
+              "fieldValue": "={{ $json.previous_stage }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "id": "log-stage-activity",
+      "name": "Log Stage Activity",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [900, 800],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": "",
+        "sheetName": "Daily Activity Log",
+        "columnRow": "A1",
+        "dataMode": "define",
+        "valueInputMode": "define",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "timestamp",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "column": "activity_type",
+              "fieldValue": "candidate_stage_progression"
+            },
+            {
+              "column": "candidate_id",
+              "fieldValue": "={{ $json.candidate_id }}"
+            },
+            {
+              "column": "stage_change",
+              "fieldValue": "={{ $json.previous_stage }} → {{ $json.new_stage }}"
+            },
+            {
+              "column": "outcome",
+              "fieldValue": "={{ $json.outcome || 'Progressed' }}"
+            },
+            {
+              "column": "notes",
+              "fieldValue": "={{ $json.notes || 'Automated stage progression' }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "webhook-candidate-application": [
+      [
+        {
+          "node": "enrich-candidate-data",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "enrich-candidate-data": [
+      [
+        {
+          "node": "add-to-candidate-master",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "add-to-candidate-master": [
+      [
+        {
+          "node": "ai-candidate-assessment",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "ai-candidate-assessment": [
+      [
+        {
+          "node": "route-by-score",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "route-by-score": [
+      [
+        {
+          "node": "email-excellent-candidates",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "email-good-candidates",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "email-average-candidates",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "email-low-candidates",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "email-excellent-candidates": [
+      [
+        {
+          "node": "update-candidate-score",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "email-good-candidates": [
+      [
+        {
+          "node": "update-candidate-score",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "email-average-candidates": [
+      [
+        {
+          "node": "update-candidate.Score",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "email-low-candidates": [
+      [
+        {
+          "node": "update-candidate-score",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "webhook-stage-progression": [
+      [
+        {
+          "node": "route-stage-progression",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "route-stage-progression": [
+      [
+        {
+          "node": "update-candidate-stage",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "update-candidate-stage": [
+      [
+        {
+          "node": "log-stage-activity",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "active": false,
+  "settings": {}
+}
